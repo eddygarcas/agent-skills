@@ -136,7 +136,19 @@ that matter.
 Most of the forward progress in practice came from upstream fixes — both projects merge well-evidenced
 issues and PRs within hours. The method (isolate → minimal repro → verify it fails on current main/master
 and passes on CRuby → dedupe → data-safety scan → file in house style, one PR per fix with a regression
-test that fails without the fix): `references/upstream-reporting.md`.
+test that fails without the fix): `references/upstream-reporting.md`. It also covers when to open an issue
+rather than a PR, how to handle bot and maintainer review, and what to do once the app builds — turning each
+post-emit workaround into an upstream fix and leaving regression fixtures behind.
+
+## 7. After the binary builds
+
+A build is not a working app. Smoke-test the endpoints the user cares about (seed first, then start the binary
+and `curl` them) and expect a second round: views that lower to `{}`, unmodeled gems (pagination,
+auth helpers), id types the runtime assumes are Integer. Fix those the same way — post-emit for now, upstream
+for good. Be explicit with the user about what the binary is: SQLite only, stubbed paths raise, and anything
+the stubs bypass (authentication included) is not enforced — never expose it. If the real goal is a single
+deployable file or more speed rather than the experiment itself, point out the alternatives: a packager that
+bundles the interpreter and the unchanged app into one executable, or Ruby's own JITs (YJIT/ZJIT).
 
 ## Pitfalls that cost real time
 
@@ -152,11 +164,19 @@ test that fails without the fix): `references/upstream-reporting.md`.
 - GCC 14+ turns some Spinel warnings into errors (`-Wreturn-mismatch`); if a build fails only under gcc,
   try `CC=clang` to confirm before blaming the app.
 - The compile has no timeout in Spinel's own corpus runner; an exponential regression shows up as "slow",
-  not "failed" — measure.
+  not "failed" — measure. A build that never leaves type inference is usually the fixpoint not converging;
+  `SP_FIXPOINT_LOG=1` (or the round counter under gdb) tells you within minutes.
+- A fix in one tool can expose a bug in the other: a newly emitted type declaration can turn a long-silent
+  mis-binding into a refusal. Check the commit that changed the emit before assuming a regression.
+- Rewrites in the post-emit script should assert their exact match counts and stop when they differ — a silent
+  zero-match after an upstream change looks like success.
+- Keep a written recovery note (where things are, what is pinned and why, how to recreate the periodic job,
+  what was in progress) so a new session can resume instead of rediscovering.
 
 ## Keeping it current
 
 Upstream changes daily. For long campaigns, schedule a periodic job that fetches both repos, reports new
 commits touching the areas you depend on, tracks your open issues/PRs, and re-runs the pipeline when
 something moved — with strict gates before anything is filed automatically (see the end of
-`references/upstream-reporting.md`).
+`references/upstream-reporting.md`, including how often to run it, how to compare runs, and what to do when
+an upstream change starts rejecting the app).

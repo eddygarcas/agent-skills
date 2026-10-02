@@ -64,6 +64,40 @@ A private app must never leak into a public report.
 - If a fix lives only in a file a sibling PR also touches, say so and link it ("whichever lands second
   rebases cleanly").
 - Things with no clear fix become issues, with the repro and a one-line suggestion.
+- **After opening:** bots review too (roundhouse runs CodeRabbit). Verify each finding against the code and
+  real Ruby before acting — most are right, some aren't. Fix the valid ones in the same commit and reply on the
+  thread with the test name; for a finding that is a separate improvement, reply that it is left for a follow-up
+  rather than growing the PR. Maintainers sometimes rebase your branch themselves: fetch before pushing and use
+  `--force-with-lease`, so you never overwrite a newer head. Don't merge your own PR in someone else's project
+  just because you have the rights — the maintainer who asked for changes usually merges.
+- **CI failures that aren't yours:** if every job fails the same way, read one log. A broken `main` at the time
+  CI ran shows up as one compile error in a file you didn't touch; check `main`'s own CI at that commit, then
+  rebase onto the fixed `main`.
+
+## Issue or PR?
+
+Open a **PR** only when all of these hold: the fix is small and in one place with a single right answer; a
+regression test proves it (fails on main for the right reason, passes with the fix); the full suite shows
+nothing else moved; and it needs no design decision only the maintainers should make (if one comes up, decide
+it by matching Ruby's behaviour and explain why in the thread). Open an **issue** instead when the fix touches
+design or a wide area (a new gem's runtime support, a whole dialect), when the cause is deep in the other
+project's internals (most of Spinel's codegen — Matz fixes clean repros within hours, and Spinel PRs now need
+`make gate` output), when the behaviour may be intended (ask, don't patch), when a maintainer has said they
+prefer to make that kind of change themselves, or when you can reproduce it but haven't found the cause. For
+a structural addition (a new fixture app, a new CI lane), propose it in an issue and offer the PR.
+
+## Long-term contributions
+
+Once the app builds, the post-emit script is a list of upstream gaps. Work it down:
+1. **Turn workarounds into fixes.** For each post-emit section, decide issue or PR by the rules above; when the
+   fix lands, delete the section (its comment should already say which issue it waits for).
+2. **File what you only noted.** Shapes you worked around during triage need their own generic fixture before
+   filing; check them against current `main` first — some are fixed already.
+3. **Help with the big gaps** (e.g. a Postgres lane) by researching the pieces and offering one in the
+   maintainers' thread — generic, no stack details — before writing code.
+4. **Leave regression coverage behind.** Check which of the fixed shapes the project's tests already cover and
+   propose a small generic fixture app (API-only, UUID keys, concerns, keyword helpers, pagination, token auth)
+   for its CI, so the fixes stay fixed after you stop watching.
 
 ## Staying current and automation
 
@@ -74,3 +108,23 @@ and re-run the pipeline when something moved. If you let an agent file reports o
 isolated repro, not caused by your shims, not a duplicate, clean sensitive scan, at most one issue per repo
 per run, issues only (no PRs, no comments on others' threads), everything else saved as a local draft for
 a human.
+
+Lessons from running such a job for days:
+- **Every 2 hours is enough.** A pipeline run takes 25–35 minutes (longer when it reduces a failure); hourly
+  runs overlap and the second one just hits the lock.
+- **Compare by error key, not by count**, and against the last *real* build: a run that stopped at a refusal
+  reports 0 C errors, which is not an improvement. Strip tree paths and counts from the keys before diffing.
+- **New items are invisible to a baseline-diff script on their first run.** Check recently filed items directly
+  (`gh search issues --author <you> --sort updated`).
+- **Upstream can add a hard stop** (a new refusal class, a feature gate that rejects the app). Decide per case:
+  pin the tool to the commit before it (cheapest, records why and how to unpin), add a pre-emit rewrite, or wait
+  for upstream. When a tool's new refusal is intended behaviour — e.g. refusing at compile time what used to
+  raise at run time — keep the old run-time behaviour with stubs that compile and raise, rather than inventing
+  implementations.
+- **Bail out early on hangs.** If the build is still in type inference after ~10 minutes, sample the fixpoint
+  round counter under gdb; a climb to the cap means a non-converging inference, not a slow build — kill it so
+  the run records a failure, then attribute it (old tree + new compiler).
+- **Clean up after every run:** the kept C file (`/tmp/spinel_out_*.c`, 80–100 MB), started servers and wait
+  loops. `pgrep -f <pattern>` matches your own shell's command line; match the process name (`pgrep -x`).
+- **The job is session-scoped.** Write down how to recreate it (schedule, prompt, pin) where the next session
+  will look.
