@@ -29,6 +29,10 @@ Set expectations with the user early, because they change what "done" means:
   `define_method` loops, `ObjectSpace`, `binding`, runtime `extend` are unsupported by design. Unmodeled
   gems (Devise, Doorkeeper, Sidekiq, pg_search…) need facades. Those paths get stubbed, so the endpoints that
   use them will not work in the binary.
+- **No `Date` on the Spinel target.** roundhouse rejects any Date (a `t.date` column, a `Date` constant, a
+  Date-typed value or signature) at the project boundary for `spinel`, even with `--allow-unsupported`. Its
+  docs call this an intended support boundary, not a bug: plan for it (wait for Date support, or rewrite Date
+  in a pre-emit copy of the app) rather than waiting for an issue to be fixed.
 - **It is slow to iterate.** A full-app `spin build` of a mid-size API takes 8–16 minutes. Batch fixes.
 
 ## 0. Before starting
@@ -47,9 +51,9 @@ Build both from source; the release binaries lag behind fixes you will need. Det
 gotchas: `references/toolchain.md`. Short form:
 
 ```sh
-# roundhouse (Rust ≥ 1.85, clang + libclang)
+# roundhouse (Rust ≥ 1.89, clang + libclang)
 git clone https://github.com/rubys/roundhouse ~/.local/src/roundhouse && cd $_
-cargo build --release --bin roundhouse && cp target/release/roundhouse ~/.local/bin/
+cargo build --release && cp target/release/roundhouse ~/.local/bin/   # all bins: roundhouse-ast, dump_ir too
 # Spinel + spin (C toolchain, sqlite3 + jemalloc dev headers; libvips only for image variants)
 git clone https://github.com/matz/spinel ~/.local/src/spinel && cd $_
 make deps && make -j"$(nproc)" && make install PREFIX=$HOME/.local
@@ -57,10 +61,18 @@ make deps && make -j"$(nproc)" && make install PREFIX=$HOME/.local
 
 Re-pull and rebuild both at the start of every session: upstream fixes are the cheapest progress you get.
 
+**Read roundhouse's own `docs/` before treating a gap as a bug.** `docs/rails-coverage.md` lists what is and
+isn't modelled (Devise/Doorkeeper route DSLs and engine mounts are dropped by design), `docs/runtime.md` keeps a
+ledger of deliberate divergences from Rails (e.g. a plain `has_many` reader answers an Array; a new record's
+id is `0`/`""`, not `nil`), and `docs/guide/` documents the support boundaries. Something documented as
+intended is a post-emit item, not a report; something the docs say is supported but misbehaves is a strong
+report — quote the doc line.
+
 ## 2. Transpile and gate the emit
 
 ```sh
 roundhouse check --continue .                     # optional: analysis report, gem census, survey of gaps
+rm -rf out/spinel                                 # a re-emit does not remove files a previous run left
 roundhouse --target spinel --survey --allow-unsupported -o out/spinel .
 scripts/check_parse.sh out/spinel                  # every emitted file must parse
 sqlite3 /tmp/t.db < out/spinel/db/seed.sql         # the seed must load
@@ -92,7 +104,7 @@ RBS sidecar loosening, ActsAsTenant, ActiveStorage UUID ids — with the reason 
 ## 4. The build loop
 
 ```sh
-cd out/spinel && spin build > ../spin-build.log 2>&1; cd -
+cd out/spinel && CC=clang spin build > ../spin-build.log 2>&1; cd -   # spin honours CC; clang ≈ 2× gcc here
 scripts/classify_errors.sh out/spin-build.log "$PWD/out/spinel"
 ```
 
@@ -161,8 +173,9 @@ bundles the interpreter and the unchanged app into one executable, or Ruby's own
 - `cargo test --release` rebuilds `target/release/<bin>`: after testing a stash of `main`, rebuild before
   trusting the binary again.
 - `git checkout -f` between branches discards staged work — commit per branch as you go.
-- GCC 14+ turns some Spinel warnings into errors (`-Wreturn-mismatch`); if a build fails only under gcc,
-  try `CC=clang` to confirm before blaming the app.
+- Build with `CC=clang` by default: roundhouse's Spinel docs measure it about twice as fast as gcc on the
+  generated C. GCC 14+ also turns some Spinel warnings into errors (`-Wreturn-mismatch`); if a build fails only
+  under gcc, that confirms it before you blame the app.
 - The compile has no timeout in Spinel's own corpus runner; an exponential regression shows up as "slow",
   not "failed" — measure. A build that never leaves type inference is usually the fixpoint not converging;
   `SP_FIXPOINT_LOG=1` (or the round counter under gdb) tells you within minutes.

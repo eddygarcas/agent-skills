@@ -6,10 +6,10 @@
 - Release installer (`curl … roundhouse-installer.sh | sh`) puts a dated snapshot in `~/.local/bin`, but
   snapshots lag weeks behind `main`. Build from source for real work:
   ```sh
-  mise use -g rust@latest            # or rustup; Rust >= 1.85
+  mise use -g rust@latest            # or rustup; Rust >= 1.89 (roundhouse docs/install.md)
   sudo pacman -S clang               # Debian: apt install clang libclang-dev (both are needed)
   git clone https://github.com/rubys/roundhouse ~/.local/src/roundhouse
-  cd ~/.local/src/roundhouse && cargo build --release --bin roundhouse
+  cd ~/.local/src/roundhouse && cargo build --release   # all bins: roundhouse, roundhouse-ast, dump_ir
   cp target/release/roundhouse ~/.local/bin/roundhouse
   ```
   First build ≈ 4 min, incremental ≈ 1 min.
@@ -17,7 +17,9 @@
   - `roundhouse check --continue <app>` — whole-program analysis; `--continue` records unrecognized
     constructs instead of aborting; prints a gem census (framework / modeled / unknown).
   - `roundhouse --target spinel --survey --allow-unsupported -o out/spinel <app>` — emit; `--survey`
-    ledgers gaps, `--allow-unsupported` emits stubs at unsupported sites instead of refusing.
+    ledgers gaps, `--allow-unsupported` emits stubs at unsupported sites instead of refusing. Emit into an
+    empty directory (`rm -rf` it first): files a previous run left behind are not removed.
+  - `roundhouse --version` — the first line of any bug report.
 - Its test suite (`cargo test --release`) needs `fixtures/real-blog`, generated with `ruby bin/rh fixture`
   (requires the `rails` gem). Two tests stay environment-dependent (`fixtures/store` absent; the system Ruby
   needs the sqlite3 gem). Compare branch vs `main` on the same machine rather than expecting zero failures.
@@ -42,7 +44,23 @@
   seed tests `make rbs-seed-test`. Run a single test with `make build/test-results/<name>.ok`.
 - Useful switches: `--rbs DIR` (seed types from sidecars — note it reads every `.rbs` in DIR), `-c` (emit C
   only), `SPINEL_KEEP_SPLIT=1` (keep the split C sources so errors in `sp_split.h` can be mapped back),
-  `--cc=clang`.
+  `--cc=clang` / `CC=clang spin build` — use clang by default: about twice as fast as gcc on Spinel's output
+  (roundhouse docs/spinel.md).
+- The built server: `./build/bin/<app> --help` lists its flags. Leave `--workers` at 1 (prefork is not ready).
+
+## Diagnostics worth knowing
+
+- `roundhouse mcp .` exposes analysis tools to an MCP client: `traceroute` lists every before/around/after
+  filter a route runs, with a footer naming what could not be resolved (check that auth/tenant filters
+  survived); `wont_lower` returns the deduplicated unsupported constructs for a target — a cheap diff between
+  roundhouse versions without a `spin build`.
+- `roundhouse-ast --stage prism|ingest|emit-ruby` (or `--stages`, `--round-trip`) and `dump_ir` speed up
+  reducing an emit bug. `emit_preview` skips the post-analyze lowerings — don't reduce lowering bugs with it.
+- `ROUNDHOUSE_TIMINGS=1 roundhouse check …` prints per-phase time and peak RSS. Every `ROUNDHOUSE_*`
+  variable is listed in roundhouse `docs/env-gates.md`.
+- A compiled server that crashes: rerun with `SPINEL_GC_VERIFY=1 SPINEL_GC_STRESS=1` (and
+  `SPINEL_GC_VERIFY_GEN=1`) to tell a GC barrier fault from a codegen fault (e.g. a method called on nil
+  through a typed slot) before reporting; `coredumpctl debug` gives named C frames that map to Ruby methods.
 
 ## Diagnosing a hang
 

@@ -39,7 +39,12 @@ A private app must never leak into a public report.
 
 - **Title**: a behavior sentence — what happens, not "bug in X" ("A leading `/` in a route target or a
   partial path means the top level").
-- **roundhouse**: problem with source and emitted excerpts, `### Fix`, `### Tests` (name the test file,
+- **Check the project's docs first.** roundhouse `docs/rails-coverage.md`, `docs/runtime.md` (its
+  "Deliberate divergences from Rails" ledger) and `docs/guide/` say what is intended. Don't file intended
+  behaviour as a bug; when the docs claim support that the code doesn't deliver, quote the doc line — it is the
+  strongest evidence you can give. Classify a divergence before filing (masked value, deliberate divergence,
+  or translation bug — roundhouse `docs/verifying.md`).
+- **roundhouse**: open with `roundhouse --version` (its docs ask for it first); problem with source and emitted excerpts, `### Fix`, `### Tests` (name the test file,
   say it fails without the change, give suite numbers vs `main`), then the footer.
 - **Spinel**: open with `Probed at master <sha>, <OS>, <compiler>`; CRuby-vs-Spinel table for behavioral
   bugs; `## Cause` / `## Change` / `## Tests` for fixes; exact error text in code blocks.
@@ -56,6 +61,13 @@ A private app must never leak into a public report.
     `ruby_prism::parse(...).errors()`. No `#[allow(dead_code)]` on helpers that are used.
   - Spinel: `test/<name>.rb` + `.rb.expected` (stdout) for the corpus; `test/rbs/<name>.rbs` +
     `.seed.expected` golden for the RBS extractor.
+  - Prefer tests that **run** the emitted code over text assertions where it is cheap: CRuby emit-and-run
+    tests, Spinel-compiled tests, or `#[ignore]`d gate tests selected by a name prefix in a CI lane (passing
+    tests named `<lane>_gate_…`, known failures named after their issue so the filter skips them).
+  - roundhouse runtime changes: land the runtime method and its emitter change in the same commit; keep
+    every runtime method fully typed (its `.rbs` sidecar, checked by `every_runtime_method_body_is_fully_typed`)
+    with a test under `runtime/ruby/test/`; record any chosen divergence from Rails in `docs/runtime.md`'s
+    ledger in the same PR; list a new `ROUNDHOUSE_*` variable in `docs/env-gates.md`.
 - Prove the test: it must **fail without the fix** for the right reason (not a compile error in the test
   itself) and pass with it.
 - Run the full suite on the branch and on unpatched main on the same machine; report both numbers. For
@@ -70,6 +82,12 @@ A private app must never leak into a public report.
   rather than growing the PR. Maintainers sometimes rebase your branch themselves: fetch before pushing and use
   `--force-with-lease`, so you never overwrite a newer head. Don't merge your own PR in someone else's project
   just because you have the rights — the maintainer who asked for changes usually merges.
+- **roundhouse CI is selective.** A PR runs the jobs its paths select (`scripts/ci-plan.py`); Spinel lanes are
+  advisory and don't run by default for analyzer or lowerer changes, and draft PRs run fixture + unit tests
+  only. Fork contributors can't apply labels: open the PR ready for review, say in the body which Spinel
+  checks you ran locally, and ask a maintainer for `ci:full` when a Spinel lane matters. Run the unit batch
+  locally with `scripts/ci-unit-tests.py` and read the whole log (a later batch can fail to compile after
+  earlier batches passed).
 - **CI failures that aren't yours:** if every job fails the same way, read one log. A broken `main` at the time
   CI ran shows up as one compile error in a file you didn't touch; check `main`'s own CI at that commit, then
   rebase onto the fixed `main`.
