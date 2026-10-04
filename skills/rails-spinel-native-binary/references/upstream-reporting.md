@@ -39,11 +39,11 @@ A private app must never leak into a public report.
 
 - **Title**: a behavior sentence — what happens, not "bug in X" ("A leading `/` in a route target or a
   partial path means the top level").
-- **Check the project's docs first.** roundhouse `docs/rails-coverage.md`, `docs/runtime.md` (its
+- **Check the project's docs first.** roundhouse `docs/guide/rails-coverage.md`, `docs/pipeline/runtime.md` (its
   "Deliberate divergences from Rails" ledger) and `docs/guide/` say what is intended. Don't file intended
   behaviour as a bug; when the docs claim support that the code doesn't deliver, quote the doc line — it is the
   strongest evidence you can give. Classify a divergence before filing (masked value, deliberate divergence,
-  or translation bug — roundhouse `docs/verifying.md`).
+  or translation bug — roundhouse `docs/guide/verifying.md`).
 - **roundhouse**: open with `roundhouse --version` (its docs ask for it first); problem with source and emitted excerpts, `### Fix`, `### Tests` (name the test file,
   say it fails without the change, give suite numbers vs `main`), then the footer.
 - **Spinel**: open with `Probed at master <sha>, <OS>, <compiler>`; CRuby-vs-Spinel table for behavioral
@@ -66,8 +66,13 @@ A private app must never leak into a public report.
     tests named `<lane>_gate_…`, known failures named after their issue so the filter skips them).
   - roundhouse runtime changes: land the runtime method and its emitter change in the same commit; keep
     every runtime method fully typed (its `.rbs` sidecar, checked by `every_runtime_method_body_is_fully_typed`)
-    with a test under `runtime/ruby/test/`; record any chosen divergence from Rails in `docs/runtime.md`'s
-    ledger in the same PR; list a new `ROUNDHOUSE_*` variable in `docs/env-gates.md`.
+    with a test under `runtime/ruby/test/`; record any chosen divergence from Rails in `docs/pipeline/runtime.md`'s
+    ledger in the same PR.
+  - Removing an error (a newly supported construct) needs an emitted-and-run regression in
+    `tests/emit_and_run.rs`, not just fewer diagnostics (docs/development/testing.md, compiler-changes.md).
+  - PR body: the repro, the regression test, and what you actually verified; report missing local SDK or
+    toolchain coverage instead of describing it as passing. Stage only your own changes; add the
+    `Co-Authored-By` trailer (docs/development/README.md).
 - Prove the test: it must **fail without the fix** for the right reason (not a compile error in the test
   itself) and pass with it.
 - Run the full suite on the branch and on unpatched main on the same machine; report both numbers. For
@@ -82,7 +87,12 @@ A private app must never leak into a public report.
   rather than growing the PR. Maintainers sometimes rebase your branch themselves: fetch before pushing and use
   `--force-with-lease`, so you never overwrite a newer head. Don't merge your own PR in someone else's project
   just because you have the rights — the maintainer who asked for changes usually merges.
-- **roundhouse CI is selective.** A PR runs the jobs its paths select (`scripts/ci-plan.py`); Spinel lanes are
+- **roundhouse CI runs a Ruby floor on PRs** (docs/ci/README.md): unit tests, Store analysis, the CRuby comparison
+  against Rails and Campfire. Spinel and the other targets don't start unless the diff owns them or a maintainer
+  applies `ci:full` (which then keeps full coverage on later pushes); pushes to `main` run full validation, and
+  extra-target red there is follow-up work, not a merge gate. `continue-on-error` can hide a Spinel failure in a green
+  summary — open the Spinel lane's own step result. A re-run may reuse earlier evidence on identical inputs; use
+  "Re-run all jobs" for a fresh run. The planner is `scripts/ci-plan.py`; Spinel lanes are
   advisory and don't run by default for analyzer or lowerer changes, and draft PRs run fixture + unit tests
   only. Fork contributors can't apply labels: open the PR ready for review, say in the body which Spinel
   checks you ran locally, and ask a maintainer for `ci:full` when a Spinel lane matters. Run the unit batch

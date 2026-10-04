@@ -61,8 +61,8 @@ make deps && make -j"$(nproc)" && make install PREFIX=$HOME/.local
 
 Re-pull and rebuild both at the start of every session: upstream fixes are the cheapest progress you get.
 
-**Read roundhouse's own `docs/` before treating a gap as a bug.** `docs/rails-coverage.md` lists what is and
-isn't modelled (Devise/Doorkeeper route DSLs and engine mounts are dropped by design), `docs/runtime.md` keeps a
+**Read roundhouse's own `docs/` before treating a gap as a bug.** `docs/guide/rails-coverage.md` lists what is and
+isn't modelled (Devise/Doorkeeper route DSLs and engine mounts are dropped by design), `docs/pipeline/runtime.md` keeps a
 ledger of deliberate divergences from Rails (e.g. a plain `has_many` reader answers an Array; a new record's
 id is `0`/`""`, not `nil`), and `docs/guide/` documents the support boundaries. Something documented as
 intended is a post-emit item, not a report; something the docs say is supported but misbehaves is a strong
@@ -170,7 +170,9 @@ bundles the interpreter and the unchanged app into one executable, or Ruby's own
   in a replacement silently pastes the match. Use the block form (`sub(old) { new }`) for literal text; with
   the block form, `\1` is *not* expanded — pick one deliberately.
 - Rust raw strings: Ruby source containing `"#{…}"` ends an `r#"…"#` early — use `r##"…"##`.
-- `cargo test --release` rebuilds `target/release/<bin>`: after testing a stash of `main`, rebuild before
+- roundhouse's own loop is `cargo test --locked` (default suite before committing, `--all-targets` at milestones,
+  `bin/rh verify --plan --base main --test <suite>` for focused runs). If you use `cargo test --release`, it rebuilds
+  `target/release/<bin>`: after testing a stash of `main`, rebuild before
   trusting the binary again.
 - `git checkout -f` between branches discards staged work — commit per branch as you go.
 - Build with `CC=clang` by default: roundhouse's Spinel docs measure it about twice as fast as gcc on the

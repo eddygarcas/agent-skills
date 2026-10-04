@@ -51,7 +51,7 @@ Spinel accepted the program; the emitted C does not type-check. Group, then fix 
 | Symptom | Usual cause | Response |
 |---|---|---|
 | the server segfaults on a request | a method called on `nil` held in a typed object slot (Spinel calls it with a NULL self instead of raising), or a GC barrier fault | `coredumpctl debug` for the frames; rerun with `SPINEL_GC_VERIFY=1 SPINEL_GC_STRESS=1`; fix the nil source app-side (often a stubbed identity), report the codegen side with a standalone repro |
-| the server hangs after a background job raised | inline jobs run at the call site; a raising job can wedge the binary (an open item in roundhouse docs/runtime.md) | make the job facade rescue, report if reproducible |
+| the server hangs after a background job raised | inline jobs run at the call site; a raising job can wedge the binary (an open item in roundhouse docs/pipeline/runtime.md) | make the job facade rescue, report if reproducible |
 
 Errors inside `/tmp/spinel_split_*/sp_split.h` carry no Ruby line. Rebuild with `SPINEL_KEEP_SPLIT=1` and map
 `#line` directives, or fix the Ruby-mapped instances of the same kind first — the split-header ones usually
