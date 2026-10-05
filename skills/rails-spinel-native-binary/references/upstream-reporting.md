@@ -52,9 +52,25 @@ A private app must never leak into a public report.
 
 ## PRs
 
-- One PR per fix, one commit, a short branch name, rebased on the current main/master. Split a combined
-  patch into per-issue hunks (a small hunk-extractor script helps), apply each on a fresh branch, and
-  commit **before** switching branches.
+- **Batch fixes into a Meta-PR** (roundhouse itself uses them, e.g. #294) instead of one PR per fix: each PR runs
+  the whole CI, sibling PRs touching the same file conflict after every merge, and each needs its own local
+  full-suite run. A Meta-PR is:
+  - **one theme** (e.g. jbuilder lowering, route ingest, the Spinel date runtime) — don't mix unrelated areas, so a
+    reviewer can still reason about it; 3–8 fixes is a good size;
+  - **one commit per fix**, each with its own regression test that fails without that commit, message titled like
+    a standalone PR (behaviour sentence), so the maintainer can review commit by commit or drop one;
+  - **one branch**, rebased on current main/master, accumulated locally (a draft branch, not a draft PR) until
+    the batch is ready — then **one** full-suite run on the tip (plus each new test checked against main) and
+    one push;
+  - a body with a table: fix / issue (`Fixes #a`, `Refs #b`) / commit / test, the suite numbers once, and the
+    verification notes.
+  - Review fixes go into the commit they belong to (`git commit --fixup <sha>` then `git rebase -i --autosquash`
+    is unavailable non-interactively — use `GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash <base>`), then one
+    `--force-with-lease` push per round, and one reply per thread naming the commit and test.
+  - Exceptions, opened as a single PR: a fix that unblocks CI or other contributors (e.g. a broken test on main),
+    a security issue, or a fix a maintainer asked for on its own.
+  - Split a combined patch into per-fix commits (a small hunk-extractor script helps); commit before switching
+    branches.
 - Add a regression test in the project's own harness:
   - roundhouse: `tests/<name>.rs` — ingest an in-memory app (`ingest_app_from_tree`), `analyze_and_lower`,
     `project::target_files(.., BuildTarget::Spinel)`, assert on the emitted text; parse emitted Ruby with

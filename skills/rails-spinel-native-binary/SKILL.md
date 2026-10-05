@@ -147,8 +147,8 @@ that matter.
 
 Most of the forward progress in practice came from upstream fixes — both projects merge well-evidenced
 issues and PRs within hours. The method (isolate → minimal repro → verify it fails on current main/master
-and passes on CRuby → dedupe → data-safety scan → file in house style, one PR per fix with a regression
-test that fails without the fix): `references/upstream-reporting.md`. It also covers when to open an issue
+and passes on CRuby → dedupe → data-safety scan → file in house style; batch related fixes into one Meta-PR — one commit per fix, each with a regression test
+that fails without it): `references/upstream-reporting.md`. It also covers when to open an issue
 rather than a PR, how to handle bot and maintainer review, and what to do once the app builds — turning each
 post-emit workaround into an upstream fix and leaving regression fixtures behind.
 
