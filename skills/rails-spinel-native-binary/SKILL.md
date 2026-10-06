@@ -29,10 +29,12 @@ Set expectations with the user early, because they change what "done" means:
   `define_method` loops, `ObjectSpace`, `binding`, runtime `extend` are unsupported by design. Unmodeled
   gems (Devise, Doorkeeper, Sidekiq, pg_search…) need facades. Those paths get stubbed, so the endpoints that
   use them will not work in the binary.
-- **No `Date` on the Spinel target.** roundhouse rejects any Date (a `t.date` column, a `Date` constant, a
-  Date-typed value or signature) at the project boundary for `spinel`, even with `--allow-unsupported`. Its
-  docs call this an intended support boundary, not a bug: plan for it (wait for Date support, or rewrite Date
-  in a pre-emit copy of the app) rather than waiting for an issue to be fixed.
+- **Only a bounded `Date` on the Spinel target.** roundhouse's Spinel runtime ships its own small `Date` (ISO
+  `YYYY-MM-DD` storage and JSON, calendar fields, month shifts), loaded only when the app has date columns or date
+  values. It is not Ruby's stdlib `date`: no `DateTime`, no non-ISO parsing, no ActiveSupport date extensions, no
+  schema date defaults, no date form helpers, no `require "date"` — those stay diagnosed (roundhouse
+  `docs/pipeline/runtime.md`). Older roundhouse versions rejected any Date for `spinel`; if you're pinned to one,
+  that is why.
 - **It is slow to iterate.** A full-app `spin build` of a mid-size API takes 8–16 minutes. Batch fixes.
 
 ## 0. Before starting
