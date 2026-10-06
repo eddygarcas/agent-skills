@@ -103,15 +103,16 @@ A private app must never leak into a public report.
   rather than growing the PR. Maintainers sometimes rebase your branch themselves: fetch before pushing and use
   `--force-with-lease`, so you never overwrite a newer head. Don't merge your own PR in someone else's project
   just because you have the rights — the maintainer who asked for changes usually merges.
-- **roundhouse CI runs a Ruby floor on PRs** (docs/ci/README.md): unit tests, Store analysis, the CRuby comparison
-  against Rails and Campfire. Spinel and the other targets don't start unless the diff owns them or a maintainer
-  applies `ci:full` (which then keeps full coverage on later pushes); pushes to `main` run full validation, and
-  extra-target red there is follow-up work, not a merge gate. `continue-on-error` can hide a Spinel failure in a green
-  summary — open the Spinel lane's own step result. A re-run may reuse earlier evidence on identical inputs; use
-  "Re-run all jobs" for a fresh run. The planner is `scripts/ci-plan.py`; Spinel lanes are
-  advisory and don't run by default for analyzer or lowerer changes, and draft PRs run fixture + unit tests
-  only. Fork contributors can't apply labels: open the PR ready for review, say in the body which Spinel
-  checks you ran locally, and ask a maintainer for `ci:full` when a Spinel lane matters. Run the unit batch
+- **roundhouse CI is a label ladder** (docs/ci/README.md, as of 2026-10-06). Every PR, draft or ready, runs the
+  path-selected Ruby floor: fixture preparation, unit shards, Store analysis, the CRuby comparison against Rails and
+  Campfire. Draft status no longer saves runners and `ci:draft` is gone, so open a Meta-PR only when the batch is
+  ready. `ci:spinel` adds the full Spinel suite (no other language SDKs); `ci:full` runs every target, WASM and
+  Writebook; stacked labels take the broader lane. Fork contributors can't apply labels: say in the body which
+  Spinel checks you ran locally and ask a maintainer for `ci:spinel` when the Spinel lane matters (`ci:full` only
+  when other targets do). Pushes to `main` run full validation; extra-target red there is follow-up work, not a
+  merge gate. `continue-on-error` can hide a Spinel failure in a green summary — open the Spinel lane's own step
+  result. A re-run may reuse earlier evidence on identical inputs; use "Re-run all jobs" for a fresh run. The
+  planner is `scripts/ci-plan.py`. Run the unit batch
   locally with `scripts/ci-unit-tests.py` and read the whole log (a later batch can fail to compile after
   earlier batches passed).
 - **CI failures that aren't yours:** if every job fails the same way, read one log. A broken `main` at the time
